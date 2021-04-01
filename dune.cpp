@@ -39,8 +39,8 @@
 namespace Dune {
 
 DuneEngine::DuneEngine(OSystem *syst, const ADGameDescription *gameDesc)
-	: Engine(syst), _gameDescription(gameDesc) {
-
+	: Engine(syst)
+{
 	_timerTicks = 0;
 	_rnd = new Common::RandomSource("dune_randomseed");
 }
@@ -68,7 +68,7 @@ Common::Error DuneEngine::run() {
 	playVideo(HNM_CRYO);
 	playVideo(HNM_CRYO2);
 	playVideo(HNM_PRESENT);
-	playVideo(HNM_FORT);
+	// playVideo(HNM_FORT);
 	playVideo(HNM_IRULAN);
 
 	return Common::kNoError;

@@ -76,11 +76,10 @@ enum HNMVideos {
 
 class DuneEngine : public Engine {
 public:
-	DuneEngine(OSystem *syst, const ADGameDescription *gameDesc);
-	~DuneEngine();
+	DuneEngine(OSystem *syst, const ADGameDescription *desc);
+	~DuneEngine() override;
 
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
+	Common::Error run() override;
 
 	bool isCD();
 

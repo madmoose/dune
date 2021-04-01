@@ -20,23 +20,23 @@
  *
  */
 
-#include "engines/advancedDetector.h"
-
-#include "common/savefile.h"
-#include "common/system.h"
-#include "common/util.h"
-
-#include "base/plugins.h"
 
 #include "dune/dune.h"
 
-static const PlainGameDescriptor cryoGames[] = {
-	{ "dune", "Dune" },
-	{ 0, 0 }
-};
+#include "common/config-manager.h"
+#include "common/system.h"
+#include "common/savefile.h"
+#include "common/serializer.h"
+#include "common/translation.h"
 
+#include "engines/advancedDetector.h"
 
 namespace Dune {
+
+static const PlainGameDescriptor duneGames[] = {
+	{"dune", "Dune"},
+	{0, 0}
+};
 
 static const ADGameDescription gameDescriptions[] = {
 	// CD version
@@ -58,43 +58,31 @@ static const ADGameDescription gameDescriptions[] = {
 
 } // End of namespace Dune
 
-class DuneMetaEngine : public AdvancedMetaEngine {
+class DuneMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	//OLD STYLE DuneMetaEngine() : AdvancedMetaEngine(detectionParams) {}
-	//NEW STYLE
-	DuneMetaEngine() : AdvancedMetaEngine(Dune::gameDescriptions, sizeof(ADGameDescription), cryoGames) {}
+	DuneMetaEngineDetection();
 
-	virtual const char *getName() const {
-		return "Dune Engine";
-	}
-
-	virtual const char *getOriginalCopyright() const {
-		return "Dune Engine (C) Cryo Interactive Entertainment";
-	}
-
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	const char *getEngineId() const override;
+	const char *getName() const override;
+	const char *getOriginalCopyright() const override;
 };
 
-bool DuneMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		false;
+DuneMetaEngineDetection::DuneMetaEngineDetection()
+	: AdvancedMetaEngineDetection(
+		Dune::gameDescriptions,
+		sizeof(Dune::gameDescriptions[0]),
+		Dune::duneGames) {}
+
+const char *DuneMetaEngineDetection::getEngineId() const {
+	return "dune";
 }
 
-bool Dune::DuneEngine::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL);
+const char *DuneMetaEngineDetection::getName() const {
+	return "Dune";
 }
 
-bool DuneMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	if (desc) {
-		*engine = new Dune::DuneEngine(syst, desc);
-	}
-	return desc != 0;
+const char *DuneMetaEngineDetection::getOriginalCopyright() const {
+	return "Dune (C) 1992 Cryo Interactive Entertainment";
 }
 
-#if PLUGIN_ENABLED_DYNAMIC(DUNE)
-	REGISTER_PLUGIN_DYNAMIC(DUNE, PLUGIN_TYPE_ENGINE, DuneMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(DUNE, PLUGIN_TYPE_ENGINE, DuneMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(DUNE_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, DuneMetaEngineDetection);
