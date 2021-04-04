@@ -56,6 +56,7 @@ Common::Error DuneEngine::run() {
 	if (!_archive.openArchive("DUNE.DAT")) {
 		debug("Failed to open DUNE.DAT");
 	}
+
 	_video = new HnmPlayer(this);
 
 	byte pal[3*256] = {0};

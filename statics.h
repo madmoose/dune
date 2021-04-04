@@ -31,6 +31,17 @@ extern const int16_t irulan[];
 
 }
 
+namespace Cursor {
+
+extern const byte Pointer[];
+extern const byte Hand[];
+extern const byte North[];
+extern const byte East[];
+extern const byte South[];
+extern const byte West[];
+
+}
+
 } // End of namespace Dune
 
 #endif

@@ -38,6 +38,38 @@ Graphics::Graphics() :
 	_global_y_offset(0)
 {}
 
+void Graphics::drawCursor(int x, int y, const byte *cursorData, byte *frameBuffer) {
+	int hotspot_y = READ_LE_INT16(cursorData+0);
+	int hotspot_x = READ_LE_INT16(cursorData+2);
+
+	y = MAX(y - hotspot_y, 0);
+	x = MAX(x - hotspot_x, 0);
+	// DNVGA includes _global_y_offset but doesn't check for overflow?
+
+	int w = MIN(16, 200 - x);
+	int h = MIN(16, 320 - y);
+
+	byte *dst = frameBuffer + 320 * y + x;
+
+	for (int cy = 0; cy != h; ++cy) {
+		uint16_t mask_b = READ_LE_UINT16(cursorData+4+2*cy);
+		uint16_t mask_w = READ_LE_UINT16(cursorData+4+2*cy+32);
+		for (int cx = 0; cx != w; ++cx) {
+			byte v = *dst;
+			if (!(mask_b & 0x8000)) {
+				v = 0x00;
+			}
+			if (mask_w & 0x8000) {
+				v = 0x0f;
+			}
+			mask_b <<= 1;
+			mask_w <<= 1;
+			*dst++ = v;
+		}
+		dst += 320 - w;
+	}
+}
+
 void Graphics::setGlobalYOffset(int y_offset) {
 	assert(y_offset >= 0);
 	assert(y_offset < 200);

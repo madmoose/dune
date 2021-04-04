@@ -36,6 +36,8 @@ class Graphics {
 
 public:
 	Graphics();
+
+	void drawCursor(int x, int y, const byte *cursorData, byte *frameBuffer);
 	void setGlobalYOffset(int y_offset);
 	void blitGraphics(Common::ReadStream *r, byte *frameBuffer, int x_offset, int y_offset, int w, int h, byte flags, byte mode);
 	void blitGraphics(byte *buf, int buf_len, byte *frameBuffer, int x_offset, int y_offset, int w, int h, byte flags, byte mode);
