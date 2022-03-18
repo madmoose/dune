@@ -23,8 +23,12 @@
 #include "dune/dune.h"
 
 #include "dune/hsq.h"
-#include "dune/video.h"
+#include "dune/intro.h"
+#include "dune/room.h"
+#include "dune/resources.h"
+#include "dune/sprite_sheet.h"
 #include "dune/statics.h"
+#include "dune/video.h"
 
 #include "common/config-manager.h"
 #include "common/debug-channels.h"
@@ -39,50 +43,163 @@
 namespace Dune {
 
 DuneEngine::DuneEngine(OSystem *syst, const ADGameDescription *gameDesc)
-	: Engine(syst)
+	: Engine(syst),
+	  _graphics(this)
 {
 	_timerTicks = 0;
+	_video = new HnmPlayer(this);
 	_rnd = new Common::RandomSource("dune_randomseed");
+
+	_currentBankId   = 0xffff;
+	_currentBankData = nullptr;
 }
 
 DuneEngine::~DuneEngine() {
 	delete _rnd;
-	DebugMan.clearAllDebugChannels();
 }
 
 Common::Error DuneEngine::run() {
-	initGraphics(320, 200);
+	debug("run");
+	_graphics.getInfo(&_screen, &_screenBufferSize);
+	_graphics.setMode();
 
 	if (!_archive.openArchive("DUNE.DAT")) {
 		debug("Failed to open DUNE.DAT");
 	}
 
-	_video = new HnmPlayer(this);
+	_framebuffer1 = new byte[320*200]{};
+	_framebuffer2 = new byte[320*200]{};
 
-	byte pal[3*256] = {0};
-	for (int i = 0; i != 256; ++i) {
-		pal[3*i+0] = pal[3*i+1] = pal[3*i+2] = i;
+	_graphics.setFrameBuffer(_framebuffer1);
+
+	Common::Event event;
+	Common::EventManager *eventMan = _system->getEventManager();
+
+	openSpriteSheet("POR.HSQ");
+
+	Room room(this, _archive.openMember("PALACE.SAL"));
+	room.draw(_framebuffer1, 0);
+
+	if (true) {
+		struct ui_element_t {
+			int16_t  x;
+			int16_t  y;
+			int16_t  unk2;
+			int16_t  unk3;
+			int16_t  unk4;
+			uint16_t id;
+			uint16_t unk6;
+		};
+
+		ui_element_t ui_elements[22] = {
+			{  22, 161,  68, 196,    0,  0xffff, 0xb8c6 },
+			{   0, 152,   0, 152,    0,       0, 0x0f66 },
+			{ 228, 152, 300, 198,    0,       3, 0x0f66 },
+			{  24, 155,  69, 176, 0x80,  0xffff, 0xaed6 },
+			{  92, 152, 229, 159,    0,      14, 0x0f66 },
+			{   2, 154,   2, 154,    0,      12, 0x0f66 },
+			{ 317, 154, 317, 154,    0,      12, 0x0f66 },
+			{  92, 159, 228, 167, 0x80,      27, 0xd443 },
+			{  92, 167, 228, 175, 0x80,      27, 0xd43e },
+			{  92, 175, 228, 183, 0x80,      27, 0xd439 },
+			{  92, 183, 228, 191, 0x80,      27, 0xd434 },
+			{  92, 191, 228, 199, 0x80,      27, 0xd42f },
+			{ 255, 162, 295, 192,    0,  0xffff, 0x0f66 },
+			{ 269, 162, 279, 172,    0,  0xffff, 0x0f66 },
+			{ 284, 172, 294, 182,    0,  0xffff, 0x0f66 },
+			{ 269, 181, 279, 191,    0,  0xffff, 0x0f66 },
+			{ 255, 172, 265, 182,    0,  0xffff, 0x0f66 },
+			{   0,   0,   0,   0,    0,  0xffff, 0x0f66 },
+			{   0,   0,   0,   0,    0,  0xffff, 0x0f66 },
+			{   0,   0,   0,   0,    0,  0xffff, 0x945b },
+			{   0,   0, 320, 152,    0,  0xffff, 0x941d },
+			{  35, 182,  56, 196, 0x80,      64, 0x9215 }
+		};
+
+		openSpriteSheet("ICONES.HSQ");
+		for (int i = 0; i != 22; ++i) {
+			if (ui_elements[i].id != 0xffff) {
+				drawSprite(
+					ui_elements[i].id,
+					ui_elements[i].x,
+					ui_elements[i].y,
+					0x00);
+			}
+		}
 	}
-	_system->getPaletteManager()->setPalette(pal, 0, 255);
 
-	playVideo(HNM_VIRGIN);
-	playVideo(HNM_CRYO);
-	playVideo(HNM_CRYO2);
-	playVideo(HNM_PRESENT);
-	// playVideo(HNM_FORT);
-	playVideo(HNM_IRULAN);
+	_system->copyRectToScreen(_framebuffer1, 320, 0, 0, 320, 200);
+	_system->updateScreen();
+
+	while (!shouldQuit()) {
+		while (eventMan->pollEvent(event)) {
+		}
+		_system->delayMillis(10);
+	}
 
 	return Common::kNoError;
 }
+
+void DuneEngine::runIntro() {
+	Intro intro(this);
+	intro.run();
+};
 
 bool DuneEngine::isCD() {
 	return _gameDescription->flags & ADGF_CD;
 }
 
+void DuneEngine::loadBank(uint16 index) {
+	if (index == _currentBankId) {
+		return;
+	}
+}
+
+void DuneEngine::applyPaletteBlock(Common::ReadStream *reader) {
+	uint8 buf[3 * 256];
+	PaletteManager *paletteManager = _system->getPaletteManager();
+
+	for (;;) {
+		uint16 h = reader->readUint16LE();
+		if (h == 0x100) {
+			// Skip 3 bytes
+			reader->readByte();
+			reader->readByte();
+			reader->readByte();
+			continue;
+		}
+		if (h == 0xffff) {
+			break;
+		}
+		int count = (h >> 8);
+		int index = h & 0xff;
+
+		if (count == 0) {
+			count = 256;
+		}
+
+		reader->read(buf, 3 * count);
+
+		// Convert R6G6B6 to R8G8B8
+		for (int i = 0; i != 3 * count; ++i) {
+			buf[i] = (buf[i] * 255 + 31) / 63;
+		}
+
+		paletteManager->setPalette(buf, index, count);
+	}
+}
+
 void DuneEngine::dumpResource(const char *filename) {
-	Common::SeekableReadStream *r = _archive.openMember(filename);
+	Resource r = _archive.openMember(filename);
+	if (!r) {
+		return;
+	}
+
 	Common::DumpFile f;
-	f.open(filename);
+
+	Common::String fn = filename;
+	fn.replace(6, 3, "BIN");
+	f.open(fn);
 
 	int size = r->size();
 	byte *buf = new byte[size];
@@ -93,50 +210,23 @@ void DuneEngine::dumpResource(const char *filename) {
 	delete[] buf;
 }
 
-void DuneEngine::playVideo(HNMVideos videoId) {
-	const char *hnmFilenames[] = {
-		"DFL2.HNM",    //  1
-		"MNT1.HNM",    //  2
-		"MNT2.HNM",    //  3
-		"MNT3.HNM",    //  4
-		"MNT4.HNM",    //  5
-		"SIET.HNM",    //  6
-		"PALACE.HNM",  //  7
-		"PALACE.HNM",  //  8
-		"FORT.HNM",    //  9
-		"FORT.HNM",    // 10
-		"DEAD3.HNM",   // 11
-		"DEAD.HNM",    // 12
-		"DEAD2.HNM",   // 13
-		"VER.HNM",     // 14
-		"TITLE.HNM",   // 15
-		"MTG1.HNM",    // 16
-		"MTG2.HNM",    // 17
-		"MTG3.HNM",    // 18
-		"PLANT.HNM",   // 19
-		"CREDITS.HNM", // 20
-		"VIRGIN.HNM",  // 21
-		"CRYO.HNM",    // 22
-		"CRYO2.HNM",   // 23
-		"PRESENT.HNM", // 24
-		"IRULAN.HNM",  // 25
-		"SEQA.HNM",    // 26
-		"SEQL.HNM",    // 27
-		"SEQM.HNM",    // 28
-		"SEQP.HNM",    // 29
-		"SEQG.HNM",    // 30
-		"SEQJ.HNM",    // 31
-		"SEQK.HNM",    // 32
-		"SEQI.HNM",    // 33
-		"SEQD.HNM",    // 34
-		"SEQN.HNM",    // 35
-		"SEQR.HNM"     // 36
-	};
+void DuneEngine::loadVideo(uint16 videoId) {
+	const char *filename = getResourceFilenameByIndex(videoId + INDEX_FIRST_HNM);
+	debug("openMember(\"%s\")\n", filename);
+	Resource r = _archive.openMember(filename);
+	if (!r) {
+		return;
+	}
+	_video->setReader(r);
+}
 
-	const char *filename = hnmFilenames[videoId];
-
-	Common::SeekableReadStream *r = _archive.openMember(filename);
-
+void DuneEngine::playVideo(uint16 videoId) {
+	const char *filename = getResourceFilenameByIndex(videoId + INDEX_FIRST_HNM);
+	debug("openMember(\"%s\")\n", filename);
+	Resource r = _archive.openMember(filename);
+	if (!r) {
+		return;
+	}
 	_video->setReader(r);
 
 	if (videoId == HNM_IRULAN) {
@@ -166,6 +256,47 @@ void DuneEngine::playVideo(HNMVideos videoId) {
 		nextFrameTime += (1000.0/12.0);
 	}
 
+}
+
+void DuneEngine::dumpSAL(const char *filename) {
+	Resource r = _archive.openMember(filename);
+
+	Common::Array<uint32_t> roomOffsets;
+
+	uint16_t offset_0 = r->readUint16LE();
+	roomOffsets.push_back(offset_0);
+
+	for (int i = 1; i != offset_0 / 2; ++i) {
+		uint16_t offset = r->readUint16LE();
+		roomOffsets.push_back(offset);
+	}
+
+	for (int i = 0; i != roomOffsets.size(); ++i) {
+		debug("%04x", roomOffsets[i]);
+	}
+}
+
+static void readFrameHeader(Common::ReadStream *r, int *w, int *h, byte *flags, byte *mode) {
+	byte b[4];
+	r->read(b, 4);
+
+	*w     = ((0x1 & b[1]) << 8) | b[0];
+	*flags = b[1] & 0xfe;
+	*h     = b[2];
+	*mode  = b[3];
+}
+
+void DuneEngine::openSpriteSheet(const char *filename) {
+	Resource r = _archive.openMember(filename);
+
+	debug("Opening sprite sheet %s", filename);
+	currentSpriteSheet = new SpriteSheet(this, r);
+}
+
+void DuneEngine::drawSprite(int index, int dst_x, int dst_y, byte draw_flags) {
+	assert(currentSpriteSheet);
+
+	currentSpriteSheet->draw(index, dst_x, dst_y, draw_flags);
 }
 
 } // End of namespace Dune

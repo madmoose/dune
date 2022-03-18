@@ -27,8 +27,8 @@
 
 namespace Dune {
 
-inline
-byte decompressHSQ_getBit(uint16 &queue, Common::ReadStream *src) {
+static inline
+byte getbit(uint16 &queue, Common::ReadStream *src) {
 	byte bit;
 
 	bit = queue & 1;
@@ -43,22 +43,20 @@ byte decompressHSQ_getBit(uint16 &queue, Common::ReadStream *src) {
 	return bit;
 }
 
-#define GETBIT() decompressHSQ_getBit(queue, src)
-
 template <typename T>
 void decompressHSQ(Common::ReadStream *src, int packedLength, T buf, int unpackedLength) {
 	uint16 queue = 0;
 	int dst = 0;
 
 	for (;;) {
-		if (GETBIT()) {
+		if (getbit(queue, src)) {
 			assert(dst < unpackedLength);
 			buf[dst++] = src->readByte();
 		} else {
 			int count;
 			int offset;
 
-			if (GETBIT()) {
+			if (getbit(queue, src)) {
 				uint16 word = src->readUint16LE();
 
 				count  = word & 0x07;
@@ -70,8 +68,8 @@ void decompressHSQ(Common::ReadStream *src, int packedLength, T buf, int unpacke
 					break;
 				}
 			} else {
-				byte b0 = GETBIT();
-				byte b1 = GETBIT();
+				byte b0 = getbit(queue, src);
+				byte b1 = getbit(queue, src);
 
 				count  = 2*b0 + b1;
 				offset = int(src->readByte()) - 256;
@@ -84,8 +82,6 @@ void decompressHSQ(Common::ReadStream *src, int packedLength, T buf, int unpacke
 		}
 	}
 }
-
-#undef GETBIT
 
 } // End of namespace Dune
 

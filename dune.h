@@ -34,6 +34,7 @@
 namespace Dune {
 
 class HnmPlayer;
+class SpriteSheet;
 
 enum HNMVideos {
 	HNM_DFL2,
@@ -86,17 +87,41 @@ public:
 	int _timerTicks;
 	Graphics _graphics;
 
-private:
+	byte *_framebuffer1;
+	byte *_framebuffer2;
+	byte *_screen;
+	int   _screenBufferSize;
+
+	uint16  _currentBankId;
+	byte   *_currentBankData;
+	void loadBank(uint16 index);
+
+	SpriteSheet *currentSpriteSheet = nullptr;
+
+// private:
 	Common::RandomSource *_rnd;
 	const ADGameDescription *_gameDescription;
 
 	Archive _archive;
 	void dumpResource(const char *filename);
 
-	HnmPlayer *_video;
-	void playVideo(HNMVideos videoId);
-};
+	void runIntro();
 
+	HnmPlayer *_video;
+	void loadVideo(uint16 videoId);
+	void playVideo(uint16 videoId);
+
+	void dumpSAL(const char *fn);
+	void openSpriteSheet(const char *filename);
+	void drawSprite(int index, int x, int y, byte draw_flags);
+
+	void applyPalette(Common::ReadStream *reader);
+
+	void loadBank();
+	void loadResourceByIndex();
+
+	void applyPaletteBlock(Common::ReadStream *reader);
+};
 
 } // End of namespace Dune
 

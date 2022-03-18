@@ -65,7 +65,7 @@ bool Archive::openArchive(const Common::String &archivePath) {
 	return true;
 }
 
-Common::SeekableReadStream *Archive::openMember(const Common::String &name) {
+Resource Archive::openMember(const Common::String &name) {
 	for (int i = 0; i != _count; ++i) {
 		if (strncmp(name.c_str(), (char *)_members[i].name, 16) != 0) {
 			continue;
@@ -82,6 +82,19 @@ Common::SeekableReadStream *Archive::openMember(const Common::String &name) {
 			if (buf[2] == 0 && checksum == 0xab) {
 				Common::MemoryReadStream r(buf, size, DisposeAfterUse::YES);
 
+				if (false) {
+					Common::DumpFile f;
+					f.open(name + ".packed");
+
+					int size = r.size();
+					byte *buf = new byte[size];
+					r.read(buf, size);
+
+					f.write(buf, size);
+					r.seek(0);
+				}
+
+
 				int unpackedLength = r.readUint16LE();
 				r.readByte();
 				int packedLength = r.readUint16LE();
@@ -92,12 +105,13 @@ Common::SeekableReadStream *Archive::openMember(const Common::String &name) {
 				byte *unpackedBuf = new byte[unpackedLength];
 				decompressHSQ(&r, packedLength, unpackedBuf, unpackedLength);
 
-				return new Common::MemoryReadStream(unpackedBuf, unpackedLength, DisposeAfterUse::YES);
+				return Resource(new Common::MemoryReadStream(unpackedBuf, unpackedLength, DisposeAfterUse::YES));
 			}
 		}
 
-		return new Common::MemoryReadStream(buf, size, DisposeAfterUse::YES);
+		return Resource(new Common::MemoryReadStream(buf, size, DisposeAfterUse::YES));
 	}
+
 	return nullptr;
 }
 

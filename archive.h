@@ -23,11 +23,16 @@
 #ifndef DUNE_ARCHIVE_H
 #define DUNE_ARCHIVE_H
 
+#define USE_CXX11
+
 #include "common/file.h"
+#include "common/ptr.h"
 #include "common/stream.h"
 #include "common/str.h"
 
 namespace Dune {
+
+typedef Common::SharedPtr<Common::SeekableReadStream> Resource;
 
 class Archive {
 private:
@@ -47,7 +52,7 @@ public:
 
 	bool openArchive(const Common::String &archivePath);
 
-	Common::SeekableReadStream *openMember(const Common::String &name);
+	Resource openMember(const Common::String &name);
 };
 
 } // End of namespace Dune

@@ -67,7 +67,7 @@ HnmPlayer::~HnmPlayer() {
 	_frameBuffer = nullptr;
 }
 
-void HnmPlayer::setReader(Common::SeekableReadStream *reader) {
+void HnmPlayer::setReader(Resource reader) {
 	_reader = reader;
 	_currentFrame = 0;
 
@@ -79,7 +79,7 @@ void HnmPlayer::setReader(Common::SeekableReadStream *reader) {
 void HnmPlayer::start() {
 	_headerSize = _reader->readUint16LE();
 
-	applyPaletteBlock(_reader);
+	_vm->applyPaletteBlock(_reader.get());
 
 	// Skip filler 0xff's after palette
 	while (_reader->readByte() == 0xff)
@@ -104,43 +104,13 @@ void HnmPlayer::start() {
 	memset(_frameBuffer, 0, 320*200);
 }
 
-void HnmPlayer::applyPaletteBlock(Common::ReadStream *reader) {
-	uint8 buf[3 * 256];
-	PaletteManager *paletteManager = _vm->_system->getPaletteManager();
-
-	for (;;) {
-		uint16 h = reader->readUint16LE();
-		if (h == 0x100) {
-			// Skip 3 bytes
-			reader->readByte();
-			reader->readByte();
-			reader->readByte();
-			continue;
-		}
-		if (h == 0xffff) {
-			break;
-		}
-		int count = (h >> 8);
-		int index = h & 0xff;
-
-		if (count == 0) {
-			count = 256;
-		}
-
-		reader->read(buf, 3 * count);
-
-		// Convert R6G6B6 to R8G8B8
-		for (int i = 0; i != 3 * count; ++i) {
-			buf[i] = (buf[i] << 2) | (buf[i] >> 2);
-		}
-
-		paletteManager->setPalette(buf, index, count);
-	}
-}
-
 static void readFrameHeader(Common::ReadStream *r, int *w, int *h, byte *flags, byte *mode) {
 	byte b[4];
 	r->read(b, 4);
+
+	/*
+	 * | w7 w6 w5 w4 w3 w2 w1 w0 | f6 f5 f4 f3 f2 f1 f0 w8 | h7 h6 h5 h4 h3 h2 h1 h0 | m7 m6 m5 m4 m3 m2 m1 m0 |
+	 */
 
 	*w     = ((0x1 & b[1]) << 8) | b[0];
 	*flags = b[1] & 0xfe;
@@ -182,14 +152,8 @@ void HnmPlayer::decodeAVFrame() {
 				}
 			} else {
 				// Draw subtitle image
-				_subtitleResource->seek(2*(_subtitleCurrentPart / 2) + 2, SEEK_SET);
-				int offset = _subtitleResource->readUint16LE();
-				_subtitleResource->seek(offset + 2, SEEK_SET);
-
-				int w, h;
-				byte flags, mode;
-				readFrameHeader(_subtitleResource, &w, &h, &flags, &mode);
-				_vm->_graphics.blitGraphics(_subtitleResource, _frameBuffer, 0, 190, w, h, flags, mode);
+				_vm->openSpriteSheet("IRUL1.HSQ");
+				_vm->drawSprite(_subtitleCurrentPart / 2, 0, 190, 0x00);
 			}
 			_subtitleCurrentPart++;
 		}
@@ -223,8 +187,8 @@ void HnmPlayer::decodeAVFrameChunks() {
 			{
 				size = _reader->readUint16LE();
 				int pos = _reader->pos();
-				Common::ReadStream *palReader = new Common::SubReadStream(_reader, size - 4);
-				applyPaletteBlock(palReader);
+				Common::ReadStream *palReader = new Common::SubReadStream(_reader.get(), size - 4);
+				_vm->applyPaletteBlock(palReader);
 				delete palReader;
 				_reader->seek(pos + size - 4, SEEK_SET);
 				break;
@@ -256,7 +220,7 @@ void HnmPlayer::decodeAVFrameChunks() {
 			}
 			case 0x6d6d: // mm
 			{
-				// never used...
+				debug("MM block found: %d bytes", size - 4);
 				size = _reader->readUint16LE();
 				_reader->skip(size - 4);
 				break;
@@ -266,7 +230,7 @@ void HnmPlayer::decodeAVFrameChunks() {
 				size = _frameOffsets[_currentFrame+1] + _headerSize - chunkPos;
 				assert(size >= 4);
 
-				readFrameHeader(tag, _reader,
+				readFrameHeader(tag, _reader.get(),
 					&_frameHeader.width,
 					&_frameHeader.height,
 					&_frameHeader.flags,
@@ -311,7 +275,7 @@ void HnmPlayer::decodeAVFrameChunks() {
 				assert(unpackedLength <= MAX_DECODE_BUFFER_SIZE);
 				_decodeBufferSize = unpackedLength;
 
-				decompressHSQ(_reader, packedLength, _decodeBuffer, _decodeBufferSize);
+				decompressHSQ(_reader.get(), packedLength, _decodeBuffer, _decodeBufferSize);
 				return;
 			}
 		}
@@ -351,7 +315,6 @@ void HnmPlayer::decodeVideoFrame() {
 	} else {
 		_vm->_graphics.blitGraphics(
 			_decodeBuffer + src_offset, _decodeBufferSize - src_offset,
-			_frameBuffer,
 			x_offset, y_offset,
 			w, h,
 			flags,

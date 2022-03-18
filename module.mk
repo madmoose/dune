@@ -4,7 +4,11 @@ MODULE_OBJS = \
 	archive.o \
 	dune.o \
 	graphics.o \
+	intro.o \
 	metaengine.o \
+	resources.o \
+	room.o \
+	sprite_sheet.o \
 	statics.o \
 	video.o
 
